@@ -5,7 +5,13 @@
 #include <fstream>
 #include <vector>
 #include <algorithm>
+#include <fstream>
+#include <string>
+#include <list>
+#include <sstream>
 #include "geometry.h"
+
+using namespace std;
 
 struct Triangle {
     Vec3f p1;
@@ -54,6 +60,58 @@ Vec3f cast_ray(const Vec3f& orig, const Vec3f& dir, const Triangle& tr) {
     return Vec3f(0.4, 0.4, 0.3);
 }
 
+std::list<Triangle> getTriangle(char* nomFichier) {
+    ifstream fichier(nomFichier);
+
+    int nbPoint = 0;
+    Vec3f points[3000];
+    std::list<Triangle> triangles;
+
+    if (fichier) {
+        string ligne;
+        while (getline(fichier, ligne)) {
+
+            if (ligne.find("v ") == 0) { // Si c'est un sommet
+               // points[nbPoint] = Vec3f();
+                stringstream ss(ligne);
+                string s;
+                string coordonnees[4];
+                int i = 0;
+                while (getline(ss, s, ' ')) {
+                    coordonnees[i] = s;
+                    i++;
+                }
+                nbPoint++;
+                points[nbPoint] = Vec3f(stof(coordonnees[1]), stof(coordonnees[2]), stof(coordonnees[3]) - 3);
+                points[nbPoint] = points[nbPoint] * 5;
+
+            }
+
+            else if (ligne.find("f ") == 0) { // Si c'est un triangle
+                stringstream ss(ligne);
+                string s;
+                string pt[4];
+                int i = 0;
+                while (getline(ss, s, ' ')) {
+                    pt[i] = s;
+                    i++;
+                }
+
+                for (int p = 1; p < 4; p++) {
+                    stringstream sst(pt[p]);
+                    getline(sst, pt[p], '/');
+                }
+                triangles.push_back(Triangle(points[stoi(pt[1])], points[stoi(pt[2])], points[stoi(pt[3])]));
+
+            }
+        }
+    }
+    else{
+        cout << "ERREUR: Impossible d'ouvrir le fichier en lecture." << endl;
+    }
+    return triangles;
+}
+
 void render() {
 
     const int width = 1024;
@@ -65,8 +123,6 @@ void render() {
 
     for (size_t j = 0; j < height; j++) {
         for (size_t i = 0; i < width; i++) {
-            /*float x = (2 * (i + 0.5) / (float)width - 1) * tan(fov / 2.) * width / (float)height;
-            float y = -(2 * (j + 0.5) / (float)height - 1) * tan(fov / 2.);*/
             float dir_x = (i + 0.5) - width / 2.;
             float dir_y = -(j + 0.5) + height / 2.;    // this flips the image at the same time
             float dir_z = -height / (2. * tan(fov / 2.));

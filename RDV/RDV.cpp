@@ -13,8 +13,6 @@
 
 using namespace std;
 
-#define DIST_MAX  10000000;
-
 struct Triangle {
     Vec3f p1;
     Vec3f p2;
@@ -56,8 +54,14 @@ struct Triangle {
 
 };
 
+struct Light {
+    Light(const Vec3f& p, const float& i) : position(p), intensity(i) {}
+    Vec3f position;
+    float intensity;
+};
 
-std::list<Triangle> getTriangle(char* nomFichier) {
+
+std::list<Triangle> getTriangles(char* nomFichier) {
     ifstream fichier(nomFichier);
 
     int nbPoint = 0;
@@ -79,8 +83,8 @@ std::list<Triangle> getTriangle(char* nomFichier) {
                     i++;
                 }
                 nbPoint++;
-                points[nbPoint] = Vec3f(stof(coordonnees[1]), stof(coordonnees[2]), stof(coordonnees[3]) - 3);
-                points[nbPoint] = points[nbPoint] * 5;
+                points[nbPoint] = Vec3f(stof(coordonnees[1]), stof(coordonnees[2]), stof(coordonnees[3]) - 1.85);
+                points[nbPoint] = points[nbPoint]*5 ;
 
             }
 
@@ -114,7 +118,8 @@ void render(std::list<Triangle> triangles) {
     const int width = 600;
     const int height = 700;
     const float fov = M_PI / 3.;
-
+    const float dist_max = 10000000;
+    const Light light = Light(Vec3f(-20, 20, 20), 1.5);
 
     std::vector<Vec3f> framebuffer(width * height);
 
@@ -132,7 +137,7 @@ void render(std::list<Triangle> triangles) {
 
             Triangle plusproche = triangles.front();
             Vec3f inter;
-            float dist = DIST_MAX;
+            float dist = dist_max;
             for (Triangle t : triangles) {
                 Vec3f intersection;
                 if (t.rayIntersect(Vec3f(0, 0, 0), dir, intersection)) {
@@ -146,8 +151,12 @@ void render(std::list<Triangle> triangles) {
                 }
 
             }
-            if (dist != 156) {  //Si le rayon intersecte un triangle
-                    framebuffer[i + j * width] = Vec3f(0.4, 0.4, 0.3);
+
+            if (dist < dist_max) {  //Si le rayon intersecte un triangle
+                Vec3f lightdir = (light.position - inter).normalize();
+                Vec3f N = cross(plusproche.p1 - plusproche.p2, plusproche.p1 - plusproche.p3).normalize();
+                float diffuse_light_intensity = light.intensity * std::max(0.f, lightdir * N);
+                framebuffer[i + j * width] = Vec3f(0.4, 0.4, 0.3)*diffuse_light_intensity;
             }
             else { //Si le rayon n'intersecte pas de triangle, on affiche la couleur de fond
                 framebuffer[i + j * width] = Vec3f(0.2, 0.7, 0.8);
@@ -172,8 +181,8 @@ void render(std::list<Triangle> triangles) {
     ofs.close();
 }
 
-//Prend en argument le nom du fichier .obj a afficher
+//Prend en argument le nom du fichier .obj  a afficher
 int main(int argc, char* argv[]) {
-    render(getTriangle(argv[1]));
+    render(getTriangles(argv[1]));
     return 0;
 }

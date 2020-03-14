@@ -73,7 +73,6 @@ std::list<Triangle> getTriangles(char* nomFichier) {
         while (getline(fichier, ligne)) {
 
             if (ligne.find("v ") == 0) { // Si c'est un sommet
-               // points[nbPoint] = Vec3f();
                 stringstream ss(ligne);
                 string s;
                 string coordonnees[4];
@@ -129,9 +128,7 @@ Vec3f cast_ray(const Vec3f& orig, const Vec3f& dir, std::list<Triangle> triangle
                 dist = disttr;
                 inter = intersection;
             }
-
         }
-
     }
     if (dist != distmax) {
         Vec3f lightdir = (light.position - inter).normalize();
@@ -148,8 +145,8 @@ void render(std::list<Triangle> triangles) {
 
     const int width = 600;
     const int height = 700;
+    const int d = 50;
     const float fov = M_PI / 3.;
-    const float dist_max = 10000000;
     const Light light = Light(Vec3f(-20, 20, 20), 1.5);
 
     std::vector<Vec3f> framebuffer1(width * height);
@@ -162,21 +159,21 @@ void render(std::list<Triangle> triangles) {
         for (size_t i = 0; i < width; i++) {
 
             float dir_x = (i + 0.5) - width / 2.;
-            float dir_y = -(j + 0.5) + height / 2.;    // this flips the image at the same time
+            float dir_y = -(j + 0.5) + height / 2.;
             float dir_z = -height / (2. * tan(fov / 2.));
             Vec3f dir = Vec3f(dir_x, dir_y, dir_z);
             framebuffer1[i + j * width] = cast_ray(Vec3f(eyesep / 2, 0, 0), dir, triangles, light);
             framebuffer2[i + j * width] = cast_ray(Vec3f(-eyesep / 2, 0, 0), dir, triangles, light);
 
         }
-        printf("%i \n", j);
     }
-
-    int d = 50;
+    
     std::vector<Vec3f> pixmap((width - d) * height * 3);
 
     for (size_t j = 0; j < height; j++) {
         for (size_t i = 0; i < width - d; i++) {
+
+           
             Vec3f c1 = framebuffer1[i + d + j * width];
             Vec3f c2 = framebuffer2[i + j * width];
 
@@ -193,8 +190,9 @@ void render(std::list<Triangle> triangles) {
         }
     }
 
+
     std::ofstream ofs; // save the framebuffer to file
-    ofs.open("./out.ppm", std::ios::binary);
+    ofs.open("./oufft.ppm", std::ios::binary);
     ofs << "P6\n" << width << " " << height << "\n255\n";
     for (size_t i = 0; i < height * width; ++i) {
         Vec3f& c = pixmap[i];

@@ -113,6 +113,37 @@ std::list<Triangle> getTriangles(char* nomFichier) {
     return triangles;
 }
 
+Vec3f cast_ray(const Vec3f& orig, const Vec3f& dir, std::list<Triangle> triangles, Light light) {
+
+    const int distmax = 10000000;
+    Triangle plusproche = triangles.front();
+    Vec3f inter;
+    float dist = distmax;
+
+    for (Triangle t : triangles) {
+        Vec3f intersection;
+        if (t.rayIntersect(orig, dir, intersection)) {
+            int disttr = intersection * intersection;
+            if (disttr < dist) {
+                plusproche = t;
+                dist = disttr;
+                inter = intersection;
+            }
+
+        }
+
+    }
+    if (dist != distmax) {
+        Vec3f lightdir = (light.position - inter).normalize();
+        Vec3f N = cross(plusproche.p1 - plusproche.p2, plusproche.p1 - plusproche.p3).normalize();
+        float diffuse_light_intensity = light.intensity * std::max(0.f, lightdir* N);
+        return Vec3f(0.4, 0.4, 0.3) * diffuse_light_intensity;
+    }
+    else {
+        return Vec3f(0.2, 0.7, 0.8);
+    }
+}
+
 void render(std::list<Triangle> triangles) {
 
     const int width = 600;
@@ -121,61 +152,56 @@ void render(std::list<Triangle> triangles) {
     const float dist_max = 10000000;
     const Light light = Light(Vec3f(-20, 20, 20), 1.5);
 
-    std::vector<Vec3f> framebuffer(width * height);
+    std::vector<Vec3f> framebuffer1(width * height);
+    std::vector<Vec3f> framebuffer2(width * height);
+    const float eyesep = 0.2;
 
-    Triangle tr = Triangle(Vec3f(-100, 50, -100), Vec3f(0, 0, -100), Vec3f(100, 0, -100));
 
 #pragma omp parallel for
     for (size_t j = 0; j < height; j++) {
         for (size_t i = 0; i < width; i++) {
 
-
             float dir_x = (i + 0.5) - width / 2.;
-            float dir_y = -(j + 0.5) + height / 2.;
+            float dir_y = -(j + 0.5) + height / 2.;    // this flips the image at the same time
             float dir_z = -height / (2. * tan(fov / 2.));
             Vec3f dir = Vec3f(dir_x, dir_y, dir_z);
+            framebuffer1[i + j * width] = cast_ray(Vec3f(eyesep / 2, 0, 0), dir, triangles, light);
+            framebuffer2[i + j * width] = cast_ray(Vec3f(-eyesep / 2, 0, 0), dir, triangles, light);
 
-            Triangle plusproche = triangles.front();
-            Vec3f inter;
-            float dist = dist_max;
-            for (Triangle t : triangles) {
-                Vec3f intersection;
-                if (t.rayIntersect(Vec3f(0, 0, 0), dir, intersection)) {
-                    int disttr = intersection * intersection;
-                    if (disttr < dist) {
-                        plusproche = t;
-                        dist = disttr;
-                        inter = intersection;
-                    }
-
-                }
-
-            }
-
-            if (dist < dist_max) {  //Si le rayon intersecte un triangle
-                Vec3f lightdir = (light.position - inter).normalize();
-                Vec3f N = cross(plusproche.p1 - plusproche.p2, plusproche.p1 - plusproche.p3).normalize();
-                float diffuse_light_intensity = light.intensity * std::max(0.f, lightdir * N);
-                framebuffer[i + j * width] = Vec3f(0.4, 0.4, 0.3)*diffuse_light_intensity;
-            }
-            else { //Si le rayon n'intersecte pas de triangle, on affiche la couleur de fond
-                framebuffer[i + j * width] = Vec3f(0.2, 0.7, 0.8);
-            }
-
-            //printf("%i %i\n", i, j);
         }
         printf("%i \n", j);
+    }
+
+    int d = 50;
+    std::vector<Vec3f> pixmap((width - d) * height * 3);
+
+    for (size_t j = 0; j < height; j++) {
+        for (size_t i = 0; i < width - d; i++) {
+            Vec3f c1 = framebuffer1[i + d + j * width];
+            Vec3f c2 = framebuffer2[i + j * width];
+
+            float max1 = std::max(c1[0], std::max(c1[1], c1[2]));
+            if (max1 > 1) c1 = c1 * (1. / max1);
+            float max2 = std::max(c2[0], std::max(c2[1], c2[2]));
+            if (max2 > 1) c2 = c2 * (1. / max2);
+            float avg1 = (c1.x + c1.y + c1.z) / 3.;
+            float avg2 = (c2.x + c2.y + c2.z) / 3.;
+
+            pixmap[(j * (width)+i)].x = avg1;
+            pixmap[(j * (width)+i)].y = 0;
+            pixmap[(j * (width)+i)].z = avg2;
+        }
     }
 
     std::ofstream ofs; // save the framebuffer to file
     ofs.open("./out.ppm", std::ios::binary);
     ofs << "P6\n" << width << " " << height << "\n255\n";
     for (size_t i = 0; i < height * width; ++i) {
-        Vec3f& c = framebuffer[i];
+        Vec3f& c = pixmap[i];
         float max = std::max(c[0], std::max(c[1], c[2]));
             if (max > 1) c = c * (1. / max);
             for (size_t j = 0; j < 3; j++) {
-                ofs << (char)(255 * std::max(0.f, std::min(1.f, framebuffer[i][j])));
+                ofs << (char)(255 * std::max(0.f, std::min(1.f, pixmap[i][j])));
             }
     }
     ofs.close();
